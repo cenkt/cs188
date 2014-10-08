@@ -148,8 +148,12 @@ def atLeastOne(expressions) :
     True
     """
     "*** YOUR CODE HERE ***"
-    util.raiseNotDefined()
-
+    if len(expressions) == 1 :
+        return expressions[0]
+    a = expressions[0]
+    for place in range(1, len(expressions)) :
+        a = logic.Expr('|', a, expressions[place])
+    return a
 
 def atMostOne(expressions) :
     """
@@ -157,8 +161,14 @@ def atMostOne(expressions) :
     that represents the logic that at most one of the expressions in the list is true.
     """
     "*** YOUR CODE HERE ***"
-    util.raiseNotDefined()
-
+    if len(expressions) == 1 :
+        return logic.Expr('|', logic.Expr('~', expressions[0]), expressions[0])
+    a = logic.Expr('|', logic.Expr('~', expressions[0]), logic.Expr('~', expressions[1]))
+    for place in range(len(expressions) - 1) :
+        for place1 in range(place + 1, len(expressions)) :
+            if not (place == 0 and place1 == 1) :
+                a = logic.Expr('&', a, logic.Expr('|', logic.Expr('~', expressions[place]), logic.Expr('~', expressions[place1])))
+    return a
 
 def exactlyOne(expressions) :
     """
@@ -166,8 +176,10 @@ def exactlyOne(expressions) :
     that represents the logic that exactly one of the expressions in the list is true.
     """
     "*** YOUR CODE HERE ***"
-    util.raiseNotDefined()
-
+    if len(expressions) == 1 :
+        return expressions[0]
+    a = logic.Expr('&', atMostOne(expressions), atLeastOne(expressions))
+    return a
 
 def extractActionSequence(model, actions):
     """
@@ -182,8 +194,21 @@ def extractActionSequence(model, actions):
     ['West', 'South', 'North']
     """
     "*** YOUR CODE HERE ***"
-    util.raiseNotDefined()
-
+    sequence = list()
+    time = 0
+    proceed = 1
+    while True :
+        success = 0
+        for place in range(len(actions)) :
+            if model.has_key(logic.PropSymbolExpr(actions[place], time)) and model[logic.PropSymbolExpr(actions[place], time)] :
+                sequence.append(actions[place])
+                success = 1
+            if place == len(actions) - 1 and success == 0 :
+                proceed = 0
+        time = time + 1
+        if proceed == 0 :
+            break
+    return sequence
 
 def positionLogicPlan(problem):
     """
@@ -192,8 +217,44 @@ def positionLogicPlan(problem):
     Note that STOP is not an available action.
     """
     "*** YOUR CODE HERE ***"
-    util.raiseNotDefined()
-
+    exploredStates = list()
+    exploredStates.append([problem.getStartState(), 0])
+    expression = list()
+    sequence = list()
+    territory = 0
+    while territory < len(exploredStates) :
+        position = exploredStates[territory]
+        actions = problem.actions(position[0])
+        for place in range(len(actions)) :
+            contained = 0
+            resultSample = problem.result(position[0], actions[place])[0]
+            for state in exploredStates :
+                if  resultSample == state[0] :
+                    contained = 1
+                    break
+            if contained == 0 :
+                exploredStates.append([problem.result(position[0], actions[place])[0], position[1] + 1])
+                step1 = logic.PropSymbolExpr("P", position[0][0], position[0][1], position[1])
+                step2 = logic.PropSymbolExpr(actions[place], position[1])
+                step3 = logic.PropSymbolExpr("P", resultSample[0], resultSample[1], position[1] + 1)
+                step4 = logic.Expr("&", step1, step2)
+                step5 = logic.to_cnf(logic.Expr("<=>", step3, step4))
+                expression.append(step5)
+        for state in exploredStates :
+            if problem.getGoalState() == state[0] :
+                actions1 = list()
+                for time in range(position[1] + 1) :
+                    actions1.append(logic.PropSymbolExpr("North", time))
+                    actions1.append(logic.PropSymbolExpr("West", time))
+                    actions1.append(logic.PropSymbolExpr("South", time))
+                    actions1.append(logic.PropSymbolExpr("East", time))
+                    expression.append(exactlyOne(actions1))
+                    actions1 = list()
+                expression.append(logic.PropSymbolExpr("P", state[0][0], state[0][1], state[1]))
+                return extractActionSequence(logic.pycoSAT(expression), ['North', 'East', 'South', 'West'])
+        sequence = list()
+        territory = territory + 1
+    return logic.pycoSAT(expression)
 
 def foodLogicPlan(problem):
     """
@@ -203,7 +264,64 @@ def foodLogicPlan(problem):
     Note that STOP is not an available action.
     """
     "*** YOUR CODE HERE ***"
-    util.raiseNotDefined()
+    exploredStates = list()
+    exploredStates.append((problem.getStartState(), 0))
+    expression = list()
+    sequence = list()
+    territory = 0
+    while territory < len(exploredStates) :
+
+        print("hehe")
+        print(len(exploredStates))
+        print(territory)
+
+        position = exploredStates[territory]
+        actions = problem.actions(position[0])
+        for place in range(len(actions)) :
+            contained = 0
+            resultSample = problem.result(position[0], actions[place])
+            for state in exploredStates :
+                if  resultSample[0] == state[0] :
+                    contained = 1
+                    break
+            if contained == 0 :
+                exploredStates.append((problem.result(position[0], actions[place])))
+                step1 = logic.PropSymbolExpr("P", position[0][0][0], position[0][0][1], position[1])
+                step2 = logic.PropSymbolExpr(actions[place], position[1])
+                step3 = logic.PropSymbolExpr("P", resultSample[0][0][0], resultSample[0][0][1], position[1] + 1)
+                step4 = logic.Expr("&", step1, step2)
+                step5 = logic.to_cnf(logic.Expr("<=>", step3, step4))
+                expression.append(step5)
+        for state in exploredStates :
+            if state[0][1].count == 0 :
+                actions1 = list()
+                for time in range(position[1] + 1) :
+                    actions1.append(logic.PropSymbolExpr("North", time))
+                    actions1.append(logic.PropSymbolExpr("West", time))
+                    actions1.append(logic.PropSymbolExpr("South", time))
+                    actions1.append(logic.PropSymbolExpr("East", time))
+                    expression.append(exactlyOne(actions1))
+                    actions1 = list()
+                expression.append(logic.PropSymbolExpr("P", state[0][0][0], state[0][0][1], state[1]))
+                for x in range(problem.getWidth()) :
+                    for y in range(problem.getHeight()) :
+                        if problem.getStartState()[1][x][y] :
+                            actions1 = list()
+                            for time in range(position[1] + 1) :
+                                actions1.append(logic.PropSymbolExpr("P", x, y, time))
+                                actions1.append(logic.PropSymbolExpr("P", x, y, time))
+                                actions1.append(logic.PropSymbolExpr("P", x, y, time))
+                                actions1.append(logic.PropSymbolExpr("P", x, y, time))
+                                expression.append(exactlyOne(actions1))
+                                actions1 = list()
+                print(expression)
+                print("ASDFASDFASDF")
+                print(logic.pycoSAT(expression))
+                return extractActionSequence(logic.pycoSAT(expression), ['North', 'East', 'South', 'West'])
+        sequence = list()
+        territory = territory + 1
+    print("ouver here")
+    return logic.pycoSAT(expression)
 
 def foodGhostLogicPlan(problem):
     """
