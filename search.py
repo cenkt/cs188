@@ -30,7 +30,7 @@
 
 """
 In search.py, you will implement generic search algorithms which are called by
-Pacman agents (in searchAgents.py). This is to test pushing to repo.
+Pacman agents (in searchAgents.py).
 """
 
 import util
@@ -154,7 +154,7 @@ def atLeastOne(expressions) :
     for place in range(1, len(expressions)) :
         a = logic.Expr('|', a, expressions[place])
     return a
-
+#test
 def atMostOne(expressions) :
     """
     Given a list of logic.Expr instances, return a single logic.Expr instance in CNF (conjunctive normal form)
@@ -270,11 +270,6 @@ def foodLogicPlan(problem):
     sequence = list()
     territory = 0
     while territory < len(exploredStates) :
-
-        print("hehe")
-        print(len(exploredStates))
-        print(territory)
-
         position = exploredStates[territory]
         actions = problem.actions(position[0])
         for place in range(len(actions)) :
@@ -293,7 +288,7 @@ def foodLogicPlan(problem):
                 step5 = logic.to_cnf(logic.Expr("<=>", step3, step4))
                 expression.append(step5)
         for state in exploredStates :
-            if state[0][1].count == 0 :
+            if state[0][1].count() == 0 :
                 actions1 = list()
                 for time in range(position[1] + 1) :
                     actions1.append(logic.PropSymbolExpr("North", time))
@@ -303,24 +298,22 @@ def foodLogicPlan(problem):
                     expression.append(exactlyOne(actions1))
                     actions1 = list()
                 expression.append(logic.PropSymbolExpr("P", state[0][0][0], state[0][0][1], state[1]))
-                for x in range(problem.getWidth()) :
-                    for y in range(problem.getHeight()) :
+                for x in range(1, problem.getWidth() + 1) :
+                    for y in range(1, problem.getHeight() + 1) :
                         if problem.getStartState()[1][x][y] :
                             actions1 = list()
                             for time in range(position[1] + 1) :
                                 actions1.append(logic.PropSymbolExpr("P", x, y, time))
-                                actions1.append(logic.PropSymbolExpr("P", x, y, time))
-                                actions1.append(logic.PropSymbolExpr("P", x, y, time))
-                                actions1.append(logic.PropSymbolExpr("P", x, y, time))
-                                expression.append(exactlyOne(actions1))
-                                actions1 = list()
+                            expression.append(exactlyOne(actions1))
+                            actions1 = list()
                 print(expression)
                 print("ASDFASDFASDF")
                 print(logic.pycoSAT(expression))
-                return extractActionSequence(logic.pycoSAT(expression), ['North', 'East', 'South', 'West'])
+                x = extractActionSequence(logic.pycoSAT(expression), ['North', 'East', 'South', 'West'])
+                print(x)
+                return x
         sequence = list()
         territory = territory + 1
-    print("ouver here")
     return logic.pycoSAT(expression)
 
 def foodGhostLogicPlan(problem):
