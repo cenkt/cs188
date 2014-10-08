@@ -280,37 +280,41 @@ def foodLogicPlan(problem):
                     contained = 1
                     break
             if contained == 0 :
-                exploredStates.append((problem.result(position[0], actions[place])))
+                exploredStates.append((problem.result(position[0], actions[place])[0], position[1] + 1))
                 step1 = logic.PropSymbolExpr("P", position[0][0][0], position[0][0][1], position[1])
                 step2 = logic.PropSymbolExpr(actions[place], position[1])
                 step3 = logic.PropSymbolExpr("P", resultSample[0][0][0], resultSample[0][0][1], position[1] + 1)
                 step4 = logic.Expr("&", step1, step2)
-                step5 = logic.to_cnf(logic.Expr("<=>", step3, step4))
-                expression.append(step5)
+                step5 = logic.Expr("<=>", step3, step4)
+                constrained = 0
+                for thing in expression :
+                    if thing.args[0] == step3 :
+                        constrained = 1
+                        expression.append(exactlyOne([step5, thing]))
+                        expression.remove(thing)
+                if constrained == 0 :
+                    expression.append(step5)
         for state in exploredStates :
             if state[0][1].count() == 0 :
+                expression.append(logic.PropSymbolExpr("P", state[0][0][0], state[0][0][1], state[1]))
+                expression = map(logic.to_cnf, expression)
                 actions1 = list()
-                for time in range(position[1] + 1) :
+                for time in range(position[1]) :
                     actions1.append(logic.PropSymbolExpr("North", time))
                     actions1.append(logic.PropSymbolExpr("West", time))
                     actions1.append(logic.PropSymbolExpr("South", time))
                     actions1.append(logic.PropSymbolExpr("East", time))
                     expression.append(exactlyOne(actions1))
                     actions1 = list()
-                expression.append(logic.PropSymbolExpr("P", state[0][0][0], state[0][0][1], state[1]))
                 for x in range(1, problem.getWidth() + 1) :
                     for y in range(1, problem.getHeight() + 1) :
                         if problem.getStartState()[1][x][y] :
                             actions1 = list()
                             for time in range(position[1] + 1) :
                                 actions1.append(logic.PropSymbolExpr("P", x, y, time))
-                            expression.append(exactlyOne(actions1))
+                            expression.append(atLeastOne(actions1))
                             actions1 = list()
-                print(expression)
-                print("ASDFASDFASDF")
-                print(logic.pycoSAT(expression))
                 x = extractActionSequence(logic.pycoSAT(expression), ['North', 'East', 'South', 'West'])
-                print(x)
                 return x
         sequence = list()
         territory = territory + 1
