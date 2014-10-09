@@ -217,44 +217,48 @@ def positionLogicPlan(problem):
     Note that STOP is not an available action.
     """
     "*** YOUR CODE HERE ***"
-    exploredStates = list()
-    exploredStates.append([problem.getStartState(), 0])
     expression = list()
-    sequence = list()
-    territory = 0
-    while territory < len(exploredStates) :
-        position = exploredStates[territory]
-        actions = problem.actions(position[0])
-        for place in range(len(actions)) :
-            contained = 0
-            resultSample = problem.result(position[0], actions[place])[0]
-            for state in exploredStates :
-                if  resultSample == state[0] :
-                    contained = 1
-                    break
-            if contained == 0 :
-                exploredStates.append([problem.result(position[0], actions[place])[0], position[1] + 1])
-                step1 = logic.PropSymbolExpr("P", position[0][0], position[0][1], position[1])
-                step2 = logic.PropSymbolExpr(actions[place], position[1])
-                step3 = logic.PropSymbolExpr("P", resultSample[0], resultSample[1], position[1] + 1)
-                step4 = logic.Expr("&", step1, step2)
-                step5 = logic.to_cnf(logic.Expr("<=>", step3, step4))
-                expression.append(step5)
-        for state in exploredStates :
-            if problem.getGoalState() == state[0] :
-                actions1 = list()
-                for time in range(position[1] + 1) :
-                    actions1.append(logic.PropSymbolExpr("North", time))
-                    actions1.append(logic.PropSymbolExpr("West", time))
-                    actions1.append(logic.PropSymbolExpr("South", time))
-                    actions1.append(logic.PropSymbolExpr("East", time))
-                    expression.append(exactlyOne(actions1))
-                    actions1 = list()
-                expression.append(logic.PropSymbolExpr("P", state[0][0], state[0][1], state[1]))
-                return extractActionSequence(logic.pycoSAT(expression), ['North', 'East', 'South', 'West'])
-        sequence = list()
-        territory = territory + 1
-    return logic.pycoSAT(expression)
+    for x in range(1, problem.getWidth() + 1) :
+        for y in range(1, problem.getHeight() + 1) :
+            if (x, y) == problem.getStartState() :
+                expression.append(logic.PropSymbolExpr("P", problem.getStartState()[0], problem.getStartState()[1], 0))
+            else :
+                expression.append(logic.Expr("~", logic.PropSymbolExpr("P", x, y, 0)))
+    for steps in range(1, 50) :
+        for x in range(1, problem.getWidth() + 1) :
+            for y in range(1, problem.getHeight() + 1) :
+                position = (x, y)
+                for time in range(steps) :
+                    step1 = logic.PropSymbolExpr("P", position[0], position[1], time + 1)
+                    sequence = list()
+                    for action in problem.actions(position) :
+                        if action == "North" :
+                            move = "South"
+                        elif action == "West" :
+                            move = "East"
+                        elif action == "South" :
+                            move = "North"
+                        else :
+                            move = "West"
+                        step2 = logic.PropSymbolExpr(move, time)
+                        step3 = logic.PropSymbolExpr("P", problem.result(position, action)[0][0], problem.result(position, action)[0][1], time)
+                        step4 = logic.Expr("&", step2, step3)
+                        sequence.append(step4)
+                    if len(sequence) > 0 :
+                        expression.append(logic.to_cnf(logic.Expr("<=>", step1, atLeastOne(sequence))))
+        actions1 = list()
+        for time in range(steps) :
+            actions1.append(logic.PropSymbolExpr("North", time))
+            actions1.append(logic.PropSymbolExpr("West", time))
+            actions1.append(logic.PropSymbolExpr("South", time))
+            actions1.append(logic.PropSymbolExpr("East", time))
+            expression.append(exactlyOne(actions1))
+            actions1 = list()
+        expression.append(logic.PropSymbolExpr("P", problem.getGoalState()[0], problem.getGoalState()[1], steps))
+        if logic.pycoSAT(expression) != False :
+            return extractActionSequence(logic.pycoSAT(expression), ['North', 'East', 'South', 'West'])
+        expression.pop()
+    return 0
 
 def foodLogicPlan(problem):
     """
@@ -264,61 +268,56 @@ def foodLogicPlan(problem):
     Note that STOP is not an available action.
     """
     "*** YOUR CODE HERE ***"
-    exploredStates = list()
-    exploredStates.append((problem.getStartState(), 0))
     expression = list()
-    sequence = list()
-    territory = 0
-    while territory < len(exploredStates) :
-        position = exploredStates[territory]
-        actions = problem.actions(position[0])
-        for place in range(len(actions)) :
-            contained = 0
-            resultSample = problem.result(position[0], actions[place])
-            for state in exploredStates :
-                if  resultSample[0] == state[0] :
-                    contained = 1
-                    break
-            if contained == 0 :
-                exploredStates.append((problem.result(position[0], actions[place])[0], position[1] + 1))
-                step1 = logic.PropSymbolExpr("P", position[0][0][0], position[0][0][1], position[1])
-                step2 = logic.PropSymbolExpr(actions[place], position[1])
-                step3 = logic.PropSymbolExpr("P", resultSample[0][0][0], resultSample[0][0][1], position[1] + 1)
-                step4 = logic.Expr("&", step1, step2)
-                step5 = logic.Expr("<=>", step3, step4)
-                constrained = 0
-                for thing in expression :
-                    if thing.args[0] == step3 :
-                        constrained = 1
-                        expression.append(exactlyOne([step5, thing]))
-                        expression.remove(thing)
-                if constrained == 0 :
-                    expression.append(step5)
-        for state in exploredStates :
-            if state[0][1].count() == 0 :
-                expression.append(logic.PropSymbolExpr("P", state[0][0][0], state[0][0][1], state[1]))
-                expression = map(logic.to_cnf, expression)
-                actions1 = list()
-                for time in range(position[1]) :
-                    actions1.append(logic.PropSymbolExpr("North", time))
-                    actions1.append(logic.PropSymbolExpr("West", time))
-                    actions1.append(logic.PropSymbolExpr("South", time))
-                    actions1.append(logic.PropSymbolExpr("East", time))
-                    expression.append(exactlyOne(actions1))
-                    actions1 = list()
-                for x in range(1, problem.getWidth() + 1) :
-                    for y in range(1, problem.getHeight() + 1) :
-                        if problem.getStartState()[1][x][y] :
-                            actions1 = list()
-                            for time in range(position[1] + 1) :
-                                actions1.append(logic.PropSymbolExpr("P", x, y, time))
-                            expression.append(atLeastOne(actions1))
-                            actions1 = list()
-                x = extractActionSequence(logic.pycoSAT(expression), ['North', 'East', 'South', 'West'])
-                return x
-        sequence = list()
-        territory = territory + 1
-    return logic.pycoSAT(expression)
+    for x in range(1, problem.getWidth() + 1) :
+        for y in range(1, problem.getHeight() + 1) :
+            if (x, y) == problem.getStartState()[0] :
+                expression.append(logic.PropSymbolExpr("P", problem.getStartState()[0][0], problem.getStartState()[0][1], 0))
+            else :
+                expression.append(logic.Expr("~", logic.PropSymbolExpr("P", x, y, 0)))
+    for steps in range(50) :
+        for x in range(1, problem.getWidth() + 1) :
+            for y in range(1, problem.getHeight() + 1) :
+                position = ((x, y), problem.getStartState()[1])
+                time = steps
+                step1 = logic.PropSymbolExpr("P", position[0][0], position[0][1], time + 1)
+                sequence = list()
+                for action in problem.actions(position) :
+                    if action == "North" :
+                        move = "South"
+                    elif action == "West" :
+                        move = "East"
+                    elif action == "South" :
+                        move = "North"
+                    else :
+                        move = "West"
+                    step2 = logic.PropSymbolExpr(move, time)
+                    step3 = logic.PropSymbolExpr("P", problem.result(position, action)[0][0][0], problem.result(position, action)[0][0][1], time)
+                    step4 = logic.Expr("&", step2, step3)
+                    sequence.append(step4)
+                if len(sequence) > 0 :
+                    expression.append(logic.to_cnf(logic.Expr("<=>", step1, atLeastOne(sequence))))
+        actions1 = list()
+        time = steps
+        actions1.append(logic.PropSymbolExpr("North", time))
+        actions1.append(logic.PropSymbolExpr("West", time))
+        actions1.append(logic.PropSymbolExpr("South", time))
+        actions1.append(logic.PropSymbolExpr("East", time))
+        expression.append(exactlyOne(actions1))
+        actions2 = list()
+        for x in range(1, problem.getWidth() + 1) :
+            for y in range(1, problem.getHeight() + 1) :
+                if problem.getStartState()[1][x][y] :
+                    for time in range(steps + 1) :
+                        actions2.append(logic.PropSymbolExpr("P", x, y, time))
+                    expression.append(atLeastOne(actions2))
+                    actions2 = list()
+        if logic.pycoSAT(expression) != False :
+            return extractActionSequence(logic.pycoSAT(expression), ['North', 'East', 'South', 'West'])
+        for x in range(problem.getStartState()[1].count()) :
+            expression.pop()
+    print("ERROR")
+    return 0
 
 def foodGhostLogicPlan(problem):
     """
