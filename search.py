@@ -224,36 +224,35 @@ def positionLogicPlan(problem):
                 expression.append(logic.PropSymbolExpr("P", problem.getStartState()[0], problem.getStartState()[1], 0))
             else :
                 expression.append(logic.Expr("~", logic.PropSymbolExpr("P", x, y, 0)))
-    for steps in range(1, 50) :
+    for steps in range(50) :
         for x in range(1, problem.getWidth() + 1) :
             for y in range(1, problem.getHeight() + 1) :
                 position = (x, y)
-                for time in range(steps) :
-                    step1 = logic.PropSymbolExpr("P", position[0], position[1], time + 1)
-                    sequence = list()
-                    for action in problem.actions(position) :
-                        if action == "North" :
-                            move = "South"
-                        elif action == "West" :
-                            move = "East"
-                        elif action == "South" :
-                            move = "North"
-                        else :
-                            move = "West"
-                        step2 = logic.PropSymbolExpr(move, time)
-                        step3 = logic.PropSymbolExpr("P", problem.result(position, action)[0][0], problem.result(position, action)[0][1], time)
-                        step4 = logic.Expr("&", step2, step3)
-                        sequence.append(step4)
-                    if len(sequence) > 0 :
-                        expression.append(logic.to_cnf(logic.Expr("<=>", step1, atLeastOne(sequence))))
+                time = steps
+                step1 = logic.PropSymbolExpr("P", position[0], position[1], time + 1)
+                sequence = list()
+                for action in problem.actions(position) :
+                    if action == "North" :
+                        move = "South"
+                    elif action == "West" :
+                        move = "East"
+                    elif action == "South" :
+                        move = "North"
+                    else :
+                        move = "West"
+                    step2 = logic.PropSymbolExpr(move, time)
+                    step3 = logic.PropSymbolExpr("P", problem.result(position, action)[0][0], problem.result(position, action)[0][1], time)
+                    step4 = logic.Expr("&", step2, step3)
+                    sequence.append(step4)
+                if len(sequence) > 0 :
+                    expression.append(logic.to_cnf(logic.Expr("<=>", step1, atLeastOne(sequence))))
         actions1 = list()
-        for time in range(steps) :
-            actions1.append(logic.PropSymbolExpr("North", time))
-            actions1.append(logic.PropSymbolExpr("West", time))
-            actions1.append(logic.PropSymbolExpr("South", time))
-            actions1.append(logic.PropSymbolExpr("East", time))
-            expression.append(exactlyOne(actions1))
-            actions1 = list()
+        time = steps
+        actions1.append(logic.PropSymbolExpr("North", time))
+        actions1.append(logic.PropSymbolExpr("West", time))
+        actions1.append(logic.PropSymbolExpr("South", time))
+        actions1.append(logic.PropSymbolExpr("East", time))
+        expression.append(exactlyOne(actions1))
         expression.append(logic.PropSymbolExpr("P", problem.getGoalState()[0], problem.getGoalState()[1], steps))
         if logic.pycoSAT(expression) != False :
             return extractActionSequence(logic.pycoSAT(expression), ['North', 'East', 'South', 'West'])
