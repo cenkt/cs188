@@ -257,7 +257,6 @@ def positionLogicPlan(problem):
         if logic.pycoSAT(expression) != False :
             return extractActionSequence(logic.pycoSAT(expression), ['North', 'East', 'South', 'West'])
         expression.pop()
-    return 0
 
 def foodLogicPlan(problem):
     """
@@ -267,56 +266,62 @@ def foodLogicPlan(problem):
     Note that STOP is not an available action.
     """
     "*** YOUR CODE HERE ***"
+    from game import Directions, Actions
+    from itertools import product
+
+
+    width, height = problem.getWidth(), problem.getHeight()
+    all_positions = list(product(range(1, width+1), range(1, height+1)))
+
+    # all directions in a list
+    ALL_DIRECTIONS = [Directions.EAST, Directions.WEST, Directions.NORTH, Directions.SOUTH]
+
+    # true if x, y is a food position
+    pos_is_food = lambda _x, _y: problem.getStartState()[1][_x][_y]
+
+
     expression = list()
-    for x in range(1, problem.getWidth() + 1) :
-        for y in range(1, problem.getHeight() + 1) :
-            if (x, y) == problem.getStartState()[0] :
-                expression.append(logic.PropSymbolExpr("P", problem.getStartState()[0][0], problem.getStartState()[0][1], 0))
-            else :
-                expression.append(logic.Expr("~", logic.PropSymbolExpr("P", x, y, 0)))
-    for steps in range(50) :
-        for x in range(1, problem.getWidth() + 1) :
-            for y in range(1, problem.getHeight() + 1) :
+    for x, y in all_positions:
+            if (x, y) == problem.getStartState()[0]:
+                expression.append(logic.PropSymbolExpr("P", x, y, 0))
+            else:
+                expression.append(~logic.PropSymbolExpr("P", x, y, 0))
+
+    for steps in range(50):
+        for x, y in all_positions:
                 position = ((x, y), problem.getStartState()[1])
                 time = steps
-                step1 = logic.PropSymbolExpr("P", position[0][0], position[0][1], time + 1)
+                step1 = logic.PropSymbolExpr("P", x, y, time + 1)
                 sequence = list()
-                for action in problem.actions(position) :
-                    if action == "North" :
-                        move = "South"
-                    elif action == "West" :
-                        move = "East"
-                    elif action == "South" :
-                        move = "North"
-                    else :
-                        move = "West"
+                for action in problem.actions(position):
+                    move = Actions.reverseDirection(action)
                     step2 = logic.PropSymbolExpr(move, time)
-                    step3 = logic.PropSymbolExpr("P", problem.result(position, action)[0][0][0], problem.result(position, action)[0][0][1], time)
+                    new_x, new_y = problem.result(position, action)[0][0]
+                    step3 = logic.PropSymbolExpr("P", new_x, new_y, time)
                     step4 = logic.Expr("&", step2, step3)
                     sequence.append(step4)
-                if len(sequence) > 0 :
+                if sequence:
                     expression.append(logic.to_cnf(logic.Expr("<=>", step1, atLeastOne(sequence))))
-        actions1 = list()
+
+        # only one action at a time
         time = steps
-        actions1.append(logic.PropSymbolExpr("North", time))
-        actions1.append(logic.PropSymbolExpr("West", time))
-        actions1.append(logic.PropSymbolExpr("South", time))
-        actions1.append(logic.PropSymbolExpr("East", time))
+        actions1 = [(logic.PropSymbolExpr(direction, time)) for direction in ALL_DIRECTIONS]
         expression.append(exactlyOne(actions1))
-        actions2 = list()
-        for x in range(1, problem.getWidth() + 1) :
-            for y in range(1, problem.getHeight() + 1) :
-                if problem.getStartState()[1][x][y] :
-                    for time in range(steps + 1) :
-                        actions2.append(logic.PropSymbolExpr("P", x, y, time))
-                    expression.append(atLeastOne(actions2))
-                    actions2 = list()
-        if logic.pycoSAT(expression) != False :
-            return extractActionSequence(logic.pycoSAT(expression), ['North', 'East', 'South', 'West'])
-        for x in range(problem.getStartState()[1].count()) :
+
+        # position of food must be reached at least once
+        for x, y in all_positions:
+            if pos_is_food(x, y):
+                actions2 = [logic.PropSymbolExpr("P", x, y, time) for time in range(time+1)]
+                expression.append(atLeastOne(actions2))
+
+        assignment = logic.pycoSAT(expression)
+        if assignment:
+            # if a valid assigment exists
+            return extractActionSequence(logic.pycoSAT(expression), ALL_DIRECTIONS)
+
+        for x in range(problem.getStartState()[1].count()):
             expression.pop()
-    print("ERROR")
-    return 0
+
 
 def foodGhostLogicPlan(problem):
     """
@@ -328,8 +333,87 @@ def foodGhostLogicPlan(problem):
     Note that STOP is not an available action.
     """
     "*** YOUR CODE HERE ***"
-    util.raiseNotDefined()
+    # util.raiseNotDefined()
 
+    width = problem.getWidth()
+    heght = problem.getHeight()
+    expression = list()
+
+    # avoid ghosts at time 1-50
+    import game
+    from itertools import product
+    vector_sum = lambda v1, v2: (v1[0]+v2[0], v1[1]+v2[1])
+
+
+    from game import Directions, Actions
+    from itertools import product
+
+
+    width, height = problem.getWidth(), problem.getHeight()
+    all_positions = list(product(range(1, width+1), range(1, height+1)))
+
+    # all directions in a list
+    ALL_DIRECTIONS = [Directions.EAST, Directions.WEST, Directions.NORTH, Directions.SOUTH]
+
+    # true if x, y is a food position
+    pos_is_food = lambda _x, _y: problem.getStartState()[1][_x][_y]
+
+
+    expression = list()
+    for x, y in all_positions:
+            if (x, y) == problem.getStartState()[0]:
+                expression.append(logic.PropSymbolExpr("P", x, y, 0))
+            else:
+                expression.append(~logic.PropSymbolExpr("P", x, y, 0))
+
+    for steps in range(50):
+        for ghost in problem.getGhostStartStates():
+            conf = game.Configuration(ghost.configuration.getPosition(), ghost.configuration.getDirection())
+            current_action = game.Directions.EAST
+            vector = {game.Directions.EAST: (1, 0), game.Directions.WEST: (-1, 0)}
+            ghost_constraints = []
+            for t in range(50):
+                x, y = conf.getPosition()
+                ghost_constraints.append(logic.to_cnf(~logic.PropSymbolExpr("P", x, y, t)))
+                possibleActions = problem.actions(((x,y), t))
+                if current_action not in possibleActions:
+                    current_action = game.Actions.reverseDirection(current_action)
+                v = vector[current_action]
+                conf.pos = vector_sum(conf.pos, v)
+        pass
+        for x, y in all_positions:
+                position = ((x, y), problem.getStartState()[1])
+                time = steps
+                step1 = logic.PropSymbolExpr("P", x, y, time + 1)
+                sequence = list()
+                for action in problem.actions(position):
+                    move = Actions.reverseDirection(action)
+                    step2 = logic.PropSymbolExpr(move, time)
+                    new_x, new_y = problem.result(position, action)[0][0]
+                    step3 = logic.PropSymbolExpr("P", new_x, new_y, time)
+                    step4 = logic.Expr("&", step2, step3)
+                    sequence.append(step4)
+                if sequence:
+                    expression.append(logic.to_cnf(logic.Expr("<=>", step1, atLeastOne(sequence))))
+
+        # only one action at a time
+        time = steps
+        actions1 = [(logic.PropSymbolExpr(direction, time)) for direction in ALL_DIRECTIONS]
+        expression.append(exactlyOne(actions1))
+
+        # position of food must be reached at least once
+        for x, y in all_positions:
+            if pos_is_food(x, y):
+                actions2 = [logic.PropSymbolExpr("P", x, y, time) for time in range(time+1)]
+                expression.append(atLeastOne(actions2))
+
+        assignment = logic.pycoSAT(expression+ghost_constraints)
+        if assignment:
+            # if a valid assigment exists
+            return extractActionSequence(assignment, ALL_DIRECTIONS)
+
+        for x in range(problem.getStartState()[1].count()):
+            expression.pop()
 
 # Abbreviations
 plp = positionLogicPlan
