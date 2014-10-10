@@ -357,7 +357,23 @@ def foodGhostLogicPlan(problem):
 
     # true if x, y is a food position
     pos_is_food = lambda _x, _y: problem.getStartState()[1][_x][_y]
-
+    ghost_dict = []
+    for ghost in problem.getGhostStartStates():
+        conf = game.Configuration(ghost.configuration.getPosition(), ghost.configuration.getDirection())
+        current_action = game.Directions.EAST
+        vector = {game.Directions.EAST: (1, 0), game.Directions.WEST: (-1, 0)}
+        ghost_constraints = []
+        for n in range(0, 25 ):
+            t = 2*n
+            x, y = conf.getPosition()
+            ghost_constraints.append(logic.to_cnf(~logic.PropSymbolExpr("P", x, y, t)))
+            ghost_dict.append((x,y,t))
+            ghost_dict.append((x,y,t+1))
+            possibleActions = problem.actions(((x, y), "lol"))
+            if current_action not in possibleActions:
+                current_action = game.Actions.reverseDirection(current_action)
+            v = vector[current_action]
+            conf.pos = vector_sum(conf.pos, v)
 
     expression = list()
     for x, y in all_positions:
@@ -366,32 +382,35 @@ def foodGhostLogicPlan(problem):
             else:
                 expression.append(~logic.PropSymbolExpr("P", x, y, 0))
 
+    def problem_action_time(x, y, cur_time):
+        no_walls = problem.actions(((x, y), 1))
+        next_time = cur_time + 1
+        old_time = cur_time - 1
+        rtn = []
+        for direction in no_walls:
+            vector = game.Actions.directionToVector(direction)
+            new_x, new_y = vector_sum(vector, (x, y))
+            if ((new_x, new_y, next_time) not in ghost_dict) and ((new_x, new_y, old_time) not in ghost_dict):
+                rtn.append(direction)
+            else:
+                # print "filtered lol"
+                pass
+        return rtn
+
+
+
     for steps in range(50):
-        for ghost in problem.getGhostStartStates():
-            conf = game.Configuration(ghost.configuration.getPosition(), ghost.configuration.getDirection())
-            current_action = game.Directions.EAST
-            vector = {game.Directions.EAST: (1, 0), game.Directions.WEST: (-1, 0)}
-            ghost_constraints = []
-            for t in range(50):
-                x, y = conf.getPosition()
-                ghost_constraints.append(logic.to_cnf(~logic.PropSymbolExpr("P", x, y, t)))
-                possibleActions = problem.actions(((x,y), t))
-                if current_action not in possibleActions:
-                    current_action = game.Actions.reverseDirection(current_action)
-                v = vector[current_action]
-                conf.pos = vector_sum(conf.pos, v)
-        pass
         for x, y in all_positions:
                 position = ((x, y), problem.getStartState()[1])
                 time = steps
-                step1 = logic.PropSymbolExpr("P", x, y, time + 1)
+                step1 = logic.PropSymbolExpr("P", x, y, time + 2)
                 sequence = list()
-                for action in problem.actions(position):
+                for action in problem_action_time(x, y, time):
                     move = Actions.reverseDirection(action)
-                    step2 = logic.PropSymbolExpr(move, time)
+                    movement = logic.PropSymbolExpr(move, time)
                     new_x, new_y = problem.result(position, action)[0][0]
-                    step3 = logic.PropSymbolExpr("P", new_x, new_y, time)
-                    step4 = logic.Expr("&", step2, step3)
+                    new_position = logic.PropSymbolExpr("P", new_x, new_y, time)
+                    step4 = logic.Expr("&", movement, new_position)
                     sequence.append(step4)
                 if sequence:
                     expression.append(logic.to_cnf(logic.Expr("<=>", step1, atLeastOne(sequence))))
@@ -409,7 +428,7 @@ def foodGhostLogicPlan(problem):
 
         assignment = logic.pycoSAT(expression+ghost_constraints)
         if assignment:
-            # if a valid assigment exists
+            # if a valid assignment exists
             return extractActionSequence(assignment, ALL_DIRECTIONS)
 
         for x in range(problem.getStartState()[1].count()):
