@@ -226,16 +226,11 @@ class ExactInference(InferenceModule):
         # util.raiseNotDefined()
         allPossible = util.Counter()
         for p in self.legalPositions:
-            total = 0
             newPosDist = self.getPositionDistribution(self.setGhostPosition(gameState, p))
-            neighbours = newPosDist.keys()
-            for xt in neighbours:
-                prob = self.getPositionDistribution(self.setGhostPosition(gameState, xt))[p]
-                total += prob * self.beliefs[xt]
-            allPossible[p] = total
+            for pos, prob in newPosDist.items():
+                allPossible[pos] += prob*self.beliefs[p]
         allPossible.normalize()
         self.beliefs = allPossible
-
 
 
     def getBeliefDistribution(self):
