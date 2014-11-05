@@ -248,6 +248,7 @@ class ParticleFilter(InferenceModule):
     def __init__(self, ghostAgent, numParticles=300):
         InferenceModule.__init__(self, ghostAgent);
         self.setNumParticles(numParticles)
+        self.particles = None
 
     def setNumParticles(self, numParticles):
         self.numParticles = numParticles
@@ -266,6 +267,9 @@ class ParticleFilter(InferenceModule):
         weight with each position) is incorrect and may produce errors.
         """
         "*** YOUR CODE HERE ***"
+        #  it's safe to assume there are more particles than legal positions
+        self.particles = (self.legalPositions*(self.numParticles/len(self.legalPositions)+1))[:self.numParticles]
+
 
     def observe(self, observation, gameState):
         """
@@ -297,8 +301,29 @@ class ParticleFilter(InferenceModule):
         noisyDistance = observation
         emissionModel = busters.getObservationDistribution(noisyDistance)
         pacmanPosition = gameState.getPacmanPosition()
-        "*** YOUR CODE HERE ***"
-        util.raiseNotDefined()
+        # "*** YOUR CODE HERE ***"
+        # util.raiseNotDefined()
+
+        if noisyDistance is None:
+            ghostPos = self.getJailPosition()
+            self.particles = [ghostPos for _ in xrange(self.numParticles)]
+            return
+
+        # Time update
+        weights = util.Counter()
+        for particle in self.particles:
+            weights[particle] += emissionModel[util.manhattanDistance(pacmanPosition, particle)]
+
+        if sum(weights.values()) == 0:
+            self.initializeUniformly(gameState)
+            return
+        # resample
+        # self.particles = [util.sampleFromCounter(weights) for _ in xrange(self.numParticles)]
+        values = weights.keys()
+        distribution = [weights[key] for key in values]
+        self.particles = util.nSample(distribution, values, self.numParticles)
+
+
 
     def elapseTime(self, gameState):
         """
@@ -325,7 +350,12 @@ class ParticleFilter(InferenceModule):
         Counter object)
         """
         "*** YOUR CODE HERE ***"
-        util.raiseNotDefined()
+        allPossible = util.Counter()
+        for particle in self.particles:
+            allPossible[particle] += 1
+        allPossible.normalize()
+        return allPossible
+
 
 class MarginalInference(InferenceModule):
     """
