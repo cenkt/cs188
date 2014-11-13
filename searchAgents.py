@@ -391,12 +391,26 @@ class AnyFoodSearchProblem(PositionSearchProblem):
 # Mini-contest 1 #
 ##################
 
+vector_sum = lambda v1, v2: (int(v1[0]+v2[0]), int(v1[1]+v2[1]))
+d2v = Actions.directionToVector
+allDirections = Actions._directions
+
+# If there exists no neighbouring food, return the movement that will leads to the nearest one.
+# If there is exactly one neighbouring food, return the movement to it.
+# Otherwise (multiple neighbours are food), choose the movement that will take the pacman furthest (in
+# term of the total distance to foods available).
+
 class ApproximateSearchAgent(Agent):
     "Implement your contest entry here.  Change anything but the class name."
+    def __init__(self):
+        self.initialPos = None
+        Agent.__init__(self)
 
     def registerInitialState(self, state):
         "This method is called before any moves are made."
         "*** YOUR CODE HERE ***"
+        if not self.initialPos:
+            self.initialPos = state.getPacmanPosition()
 
     def getAction(self, state):
         """
@@ -405,7 +419,23 @@ class ApproximateSearchAgent(Agent):
         Directions.{North, South, East, West, Stop}
         """
         "*** YOUR CODE HERE ***"
-        util.raiseNotDefined()
+        pacman_pos = state.getPacmanPosition()
+        foods = state.getFood().asList()
+        next_pos = lambda direction: vector_sum(pacman_pos, d2v(direction))
+        directions_to_food = [direction for direction in allDirections if state.hasFood(*next_pos(direction))]
+
+        if directions_to_food:
+            if len(directions_to_food) == 1:
+                return directions_to_food[0]
+            else:
+                if pacman_pos[0] < self.initialPos[0]-4:  # magic number 4
+                    return directions_to_food[0]
+                total_food_distance = lambda direction: sum([mazeDistance(next_pos(direction), food, state) for food in foods])
+                return max(directions_to_food, key=total_food_distance)
+        else:
+            nearestFood = min(foods, key=lambda food: mazeDistance(pacman_pos, food, state))
+            distanceAfterMovement = lambda movement: mazeDistance(vector_sum(d2v(movement), pacman_pos), nearestFood, state)
+            return min(state.getLegalPacmanActions(), key=distanceAfterMovement)
 
 def mazeDistance(point1, point2, gameState):
     """
